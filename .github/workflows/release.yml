@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      version: ${{ steps.release.outputs.version }}
+      major: ${{ steps.release.outputs.major }}
+      minor: ${{ steps.release.outputs.minor }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          release-type: go
+
+  build-x64-image:
+    runs-on: ubuntu-latest
+    needs: release
+    if: ${{ needs.release.outputs.release_created }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get release tag
+        id: meta
+        run: |
+          echo "tags=ghcr.io/${{ github.repository }}:${{ needs.release.outputs.version }}-x64,ghcr.io/${{ github.repository }}:latest-x64" >> $GITHUB_OUTPUT
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          provenance: false
+
+  build-arm64-image:
+    runs-on: ubuntu-24.04-arm
+    needs: release
+    if: ${{ needs.release.outputs.release_created }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Get release tag
+        id: meta
+        run: |
+          echo "tags=ghcr.io/${{ github.repository }}:${{ needs.release.outputs.version }}-arm64,ghcr.io/${{ github.repository }}:latest-arm64" >> $GITHUB_OUTPUT
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          provenance: false
+
+  publish:
+    runs-on: ubuntu-latest
+    needs:
+      [
+        release,
+        build-x64-image,
+        build-arm64-image,
+      ]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          VERSION_IMAGE=ghcr.io/${{ github.repository }}:${{ needs.release.outputs.version }} 
+          LATEST_IMAGE=ghcr.io/${{ github.repository }}:latest
+
+          docker manifest create ${VERSION_IMAGE} \
+            --amend ${VERSION_IMAGE}-x64 \
+            --amend ${VERSION_IMAGE}-arm64
+
+          docker manifest create ${LATEST_IMAGE} \
+            --amend ${LATEST_IMAGE}-x64 \
+            --amend ${LATEST_IMAGE}-arm64 
+
+          docker manifest push ${VERSION_IMAGE}
+          docker manifest push ${LATEST_IMAGE}
+

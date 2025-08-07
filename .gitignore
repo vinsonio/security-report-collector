@@ -1,0 +1,8 @@
+/.trae
+/docs
+
+# Environment variables
+.env*
+!.env.example
+
+*.db
