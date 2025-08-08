@@ -24,8 +24,15 @@ func TestCORSMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("ALLOWED_DOMAINS", tt.allowedDomains)
-			defer os.Unsetenv("ALLOWED_DOMAINS")
+			if err := os.Setenv("ALLOWED_DOMAINS", tt.allowedDomains); err != nil {
+				t.Fatal(err)
+			}
+
+			defer func() {
+				if err := os.Unsetenv("ALLOWED_DOMAINS"); err != nil {
+					t.Error("failed to unset ALLOWED_DOMAINS:", err)
+				}
+			}()
 
 			req, err := http.NewRequest("POST", "/csp-report", nil)
 			if err != nil {
