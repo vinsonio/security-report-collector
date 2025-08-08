@@ -14,7 +14,7 @@ import (
 )
 
 func TestReportService_SaveReport(t *testing.T) {
-	store := new(storagetesting.MockStore)
+	store := new(storagetesting.MockDB)
 	reportService := service.NewReportService(store)
 
 	report := types.CSPReport{

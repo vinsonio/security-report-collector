@@ -4,20 +4,15 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/joho/godotenv"
+	"github.com/vinsonio/security-report-collector/internal/bootstrap"
 	"github.com/vinsonio/security-report-collector/internal/handler"
 	"github.com/vinsonio/security-report-collector/internal/service"
-	"github.com/vinsonio/security-report-collector/internal/storage"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Fatalf("failed to load environment variables: %v", err)
-	}
-
-	store, err := storage.NewStoreFromEnv()
+	store, _, err := bootstrap.Init()
 	if err != nil {
-		log.Fatalf("failed to initialize storage: %v", err)
+		log.Fatalf("failed to initialize app: %v", err)
 	}
 
 	reportService := service.NewReportService(store)
