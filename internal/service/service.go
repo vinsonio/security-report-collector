@@ -4,19 +4,19 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 
-	"github.com/vinsonio/security-report-collector/internal/storage"
+	"github.com/vinsonio/security-report-collector/internal/database"
 	"github.com/vinsonio/security-report-collector/internal/types"
 	"github.com/vinsonio/security-report-collector/internal/util"
 )
 
 // ReportService is the service for handling reports.
 type ReportService struct {
-	store storage.Store
+	db database.DB
 }
 
 // NewReportService creates a new ReportService.
-func NewReportService(store storage.Store) *ReportService {
-	return &ReportService{store: store}
+func NewReportService(db database.DB) *ReportService {
+	return &ReportService{db: db}
 }
 
 // SaveReport saves a report.
@@ -34,5 +34,5 @@ func (s *ReportService) SaveReport(report types.Report, userAgent string) error 
 	hash := sha256.Sum256(data)
 	hashStr := hex.EncodeToString(hash[:])
 
-	return s.store.Save(report.Type(), report, userAgent, hashStr)
+	return s.db.Save(report.Type(), report, userAgent, hashStr)
 }
