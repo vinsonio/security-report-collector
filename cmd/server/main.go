@@ -11,7 +11,9 @@ import (
 )
 
 func main() {
-	godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("failed to load environment variables: %v", err)
+	}
 
 	store, err := storage.NewStoreFromEnv()
 	if err != nil {
