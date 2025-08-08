@@ -42,7 +42,9 @@ func TestRedisCache(t *testing.T) {
 	t.Skip("skipping test; redis not available in test environment")
 	c, err := NewRedisCache("localhost:6379", "", 0)
 	assert.NoError(t, err)
-	defer c.Close()
+	defer func() {
+		assert.NoError(t, c.Close())
+	}()
 	testCache(t, c, 1*time.Millisecond, 2*time.Millisecond)
 }
 
@@ -50,6 +52,8 @@ func TestMemcachedCache(t *testing.T) {
 	t.Skip("skipping test; memcached not available in test environment")
 	c, err := NewMemcachedCache("localhost:11211")
 	assert.NoError(t, err)
-	defer c.Close()
+	defer func() {
+		assert.NoError(t, c.Close())
+	}()
 	testCache(t, c, 1*time.Second, 2*time.Second)
 }

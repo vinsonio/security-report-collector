@@ -8,12 +8,17 @@ import (
 	"github.com/vinsonio/security-report-collector/internal/database"
 	dbtesting "github.com/vinsonio/security-report-collector/internal/testing"
 	"github.com/vinsonio/security-report-collector/internal/types"
+	"log"
 )
 
 func TestMain(m *testing.M) {
 	// Set the environment variable to use the in-memory SQLite database for tests
-	os.Setenv("DB_CONNECTION", "sqlite")
-	os.Setenv("DB_URL", "file:test.db?mode=memory&cache=shared")
+	if err := os.Setenv("DB_CONNECTION", "sqlite"); err != nil {
+		log.Fatal(err)
+	}
+	if err := os.Setenv("DB_URL", "file:test.db?mode=memory&cache=shared"); err != nil {
+		log.Fatal(err)
+	}
 	code := m.Run()
 	os.Exit(code)
 }
