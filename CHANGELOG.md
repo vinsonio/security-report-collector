@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/vinsonio/security-report-collector/compare/v1.1.0...v1.2.0) (2025-08-08)
+
+
+### Features
+
+* **cache:** implement cache package with multiple backends ([6f9e966](https://github.com/vinsonio/security-report-collector/commit/6f9e96611149508e7f68c2ae84866460e07165ba))
+
 ## [1.1.0](https://github.com/vinsonio/security-report-collector/compare/v1.0.0...v1.1.0) (2025-08-08)
 
 
