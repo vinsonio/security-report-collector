@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -33,8 +34,20 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		}
 
 		isAllowed := false
+		hostname := originURL.Hostname()
 		for _, domain := range strings.Split(allowedDomains, ",") {
-			if strings.TrimSpace(domain) == originURL.Hostname() {
+			trimmedDomain := strings.TrimSpace(domain)
+			if strings.Contains(trimmedDomain, "*") {
+				pattern := strings.ReplaceAll(trimmedDomain, ".", "\\.")
+				pattern = strings.ReplaceAll(pattern, "*", "[^.]+")
+				pattern = "^" + pattern + "$"
+				if re, err := regexp.Compile(pattern); err == nil {
+					if re.MatchString(hostname) {
+						isAllowed = true
+						break
+					}
+				}
+			} else if trimmedDomain == hostname {
 				isAllowed = true
 				break
 			}

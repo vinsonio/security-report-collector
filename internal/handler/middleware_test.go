@@ -20,6 +20,11 @@ func TestCORSMiddleware(t *testing.T) {
 		{"Disallowed Origin", "example.com", "http://disallowed.com", "", http.StatusForbidden},
 		{"No Origin or Referer", "example.com", "", "", http.StatusBadRequest},
 		{"Empty Allowed Domains", "", "http://example.com", "", http.StatusOK},
+		{"Wildcard Allowed Subdomain", "*.example.com", "http://sub.example.com", "", http.StatusOK},
+		{"Wildcard Disallowed Domain", "*.example.com", "http://another.com", "", http.StatusForbidden},
+		{"Wildcard Exact Match", "*.example.com", "http://example.com", "", http.StatusForbidden},
+		{"Multi-level Wildcard Allowed", "*.*.example.com", "http://a.b.example.com", "", http.StatusOK},
+		{"Multi-level Wildcard Disallowed", "*.*.example.com", "http://sub.example.com", "", http.StatusForbidden},
 	}
 
 	for _, tt := range tests {
