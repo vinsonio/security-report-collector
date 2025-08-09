@@ -48,7 +48,7 @@ func ReportMux(reportService *service.ReportService, handlers map[string]ReportH
 		}
 
 		userAgent := r.Header.Get("User-Agent")
-		if err := reportService.SaveReport(report, userAgent); err != nil {
+		if err := reportService.SaveReport(reportType, report, userAgent); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}

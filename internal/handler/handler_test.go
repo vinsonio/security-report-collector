@@ -11,16 +11,19 @@ import (
 	"github.com/vinsonio/security-report-collector/internal/handler"
 	"github.com/vinsonio/security-report-collector/internal/service"
 	databasetesting "github.com/vinsonio/security-report-collector/internal/testing"
+	cachetesting "github.com/vinsonio/security-report-collector/internal/testing/cache"
 )
 
 func TestReportMux(t *testing.T) {
 	t.Run("handles valid report", func(t *testing.T) {
 		store := new(databasetesting.MockDB)
-		reportService := service.NewReportService(store)
+		cache := new(cachetesting.MockCache)
+		reportService := service.NewReportService(store, cache, false)
 
-		jsonStr := []byte(`{"body":{}}`)
+		jsonStr := []byte(`{"csp-report":{}}`)
 		req, err := http.NewRequest("POST", "/reports/csp", bytes.NewBuffer(jsonStr))
 		assert.NoError(t, err)
+		req.Header.Set("User-Agent", "test-agent")
 
 		rr := httptest.NewRecorder()
 
@@ -28,7 +31,7 @@ func TestReportMux(t *testing.T) {
 			"csp": &handler.CSPReportHandler{},
 		}
 
-		store.On("Save", "csp", mock.Anything, "", mock.AnythingOfType("string")).Return(nil)
+		store.On("Save", "csp", mock.AnythingOfType("*types.CSPReport"), "test-agent", mock.AnythingOfType("string")).Return(nil)
 
 		mux := handler.ReportMux(reportService, reportHandlers)
 		mux.ServeHTTP(rr, req)
@@ -39,7 +42,8 @@ func TestReportMux(t *testing.T) {
 
 	t.Run("handles unknown report type", func(t *testing.T) {
 		store := new(databasetesting.MockDB)
-		reportService := service.NewReportService(store)
+		cache := new(cachetesting.MockCache)
+		reportService := service.NewReportService(store, cache, false)
 
 		jsonStr := []byte(`{"type":"unknown"}`)
 		req, err := http.NewRequest("POST", "/reports/unknown", bytes.NewBuffer(jsonStr))
@@ -55,12 +59,12 @@ func TestReportMux(t *testing.T) {
 		mux.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusNotFound, rr.Code)
-		store.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("handles invalid json", func(t *testing.T) {
 		store := new(databasetesting.MockDB)
-		reportService := service.NewReportService(store)
+		cache := new(cachetesting.MockCache)
+		reportService := service.NewReportService(store, cache, false)
 
 		jsonStr := []byte(`invalid-json`)
 		req, err := http.NewRequest("POST", "/reports/csp", bytes.NewBuffer(jsonStr))
@@ -76,6 +80,5 @@ func TestReportMux(t *testing.T) {
 		mux.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
-		store.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 }

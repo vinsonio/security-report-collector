@@ -3,56 +3,65 @@ package service_test
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"testing"
-
-	"github.com/vinsonio/security-report-collector/internal/util"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/vinsonio/security-report-collector/internal/service"
-	storagetesting "github.com/vinsonio/security-report-collector/internal/testing"
+	databasetesting "github.com/vinsonio/security-report-collector/internal/testing"
+	testingcache "github.com/vinsonio/security-report-collector/internal/testing/cache"
 	"github.com/vinsonio/security-report-collector/internal/types"
+	"github.com/vinsonio/security-report-collector/internal/util"
 )
 
 func TestReportService_SaveReport(t *testing.T) {
-	store := new(storagetesting.MockDB)
-	reportService := service.NewReportService(store)
-
-	report := types.CSPReport{
-		ReportType: "csp-violation",
-		URL:  "https://example.com",
+	report := &types.CSPReport{
 		Body: types.CSPReportBody{
-			DocumentURL:        "https://example.com",
-			Disposition:        "report",
+			DocumentURL:        "http://example.com/signup.html",
 			Referrer:           "",
-			EffectiveDirective: "font-src",
-			BlockedURL:         "https://fonts.gstatic.com/s/inter/v19/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2ZL7W0Q5n-wU.woff2",
-			OriginalPolicy:     "default-src 'self'; script-src 'self'; img-src: 'self'; report-to csp",
-			StatusCode:         200,
-			Sample:             "",
-			SourceFile:         "https://example.com",
-			LineNumber:         0,
-			ColumnNumber:       1,
+			BlockedURL:         "http://example.com/css/style.css",
+			EffectiveDirective: "style-src cdn.example.com",
+			OriginalPolicy:     "default-src 'none'; style-src cdn.example.com; report-uri /_/csp-reports",
 		},
 	}
 
-	hashData := types.CSPReportHashData{
-		DocumentURL:        report.Body.DocumentURL,
-		EffectiveDirective: report.Body.EffectiveDirective,
-		BlockedURL:         report.Body.BlockedURL,
-		SourceFile:         report.Body.SourceFile,
-		LineNumber:         report.Body.LineNumber,
-		ColumnNumber:       report.Body.ColumnNumber,
-	}
-
-	data, err := util.StableMarshal(hashData)
+	hashData, err := report.HashData()
 	assert.NoError(t, err)
-	hashBytes := sha256.Sum256(data)
-	hash := hex.EncodeToString(hashBytes[:])
-
-	store.On("Save", "csp", report, "user-agent", hash).Return(nil)
-
-	err = reportService.SaveReport(report, "user-agent")
+	hashBytes, err := util.StableMarshal(hashData)
 	assert.NoError(t, err)
+	hashSum := sha256.Sum256(hashBytes)
+	hash := hex.EncodeToString(hashSum[:])
 
-	store.AssertExpectations(t)
+	t.Run("cache enabled", func(t *testing.T) {
+		store := new(databasetesting.MockDB)
+		cache := new(testingcache.MockCache)
+		reportService := service.NewReportService(store, cache, true)
+		reportJSON, err := json.Marshal(report)
+		assert.NoError(t, err)
+
+		cache.On("Set", hash, reportJSON, time.Hour).Return(nil)
+		store.On("Save", "csp", report, "user-agent", hash).Return(nil)
+
+		err = reportService.SaveReport("csp", report, "user-agent")
+		assert.NoError(t, err)
+
+		store.AssertExpectations(t)
+		cache.AssertExpectations(t)
+	})
+
+	t.Run("cache disabled", func(t *testing.T) {
+		store := new(databasetesting.MockDB)
+		cache := new(testingcache.MockCache)
+		reportService := service.NewReportService(store, cache, false)
+
+		store.On("Save", "csp", report, "user-agent", hash).Return(nil)
+
+		err = reportService.SaveReport("csp", report, "user-agent")
+		assert.NoError(t, err)
+
+		store.AssertExpectations(t)
+		cache.AssertNotCalled(t, "Set", mock.Anything, mock.Anything, mock.Anything)
+	})
 }

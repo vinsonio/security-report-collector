@@ -5,17 +5,19 @@ import (
 	"net/http"
 
 	"github.com/vinsonio/security-report-collector/internal/bootstrap"
+	"github.com/vinsonio/security-report-collector/internal/config"
 	"github.com/vinsonio/security-report-collector/internal/handler"
 	"github.com/vinsonio/security-report-collector/internal/service"
 )
 
 func main() {
-	store, _, err := bootstrap.Init()
+	db, cache, err := bootstrap.Init()
 	if err != nil {
 		log.Fatalf("failed to initialize app: %v", err)
 	}
 
-	reportService := service.NewReportService(store)
+	appConfig := config.NewApp()
+	reportService := service.NewReportService(db, cache, appConfig.CacheEnabled)
 
 	http.HandleFunc("/healthz", handler.HealthCheck)
 
