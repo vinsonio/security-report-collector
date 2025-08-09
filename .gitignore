@@ -6,3 +6,6 @@
 !.env.example
 
 *.db
+
+# Test
+/coverage.out

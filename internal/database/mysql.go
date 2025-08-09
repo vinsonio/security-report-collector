@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"path/filepath"
 	"runtime"
 	"time"
@@ -38,10 +39,15 @@ func NewMySQLDB(cfg config.MySQL) (DB, error) {
 		return nil, err
 	}
 
+	return &MySQLDB{DB: db}, nil
+}
+
+// Migrate runs the database migrations.
+func (s *MySQLDB) Migrate() error {
 	var driver database.Driver
-	driver, err = migrate_mysql.WithInstance(db, &migrate_mysql.Config{})
+	driver, err := migrate_mysql.WithInstance(s.DB, &migrate_mysql.Config{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// get the path to the migrations directory
@@ -55,14 +61,16 @@ func NewMySQLDB(cfg config.MySQL) (DB, error) {
 		driver,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err = m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return nil, err
+		return err
 	}
 
-	return &MySQLDB{DB: db}, nil
+	log.Println("Database migration completed")
+
+	return nil
 }
 
 // Save saves a report to the database.

@@ -20,3 +20,10 @@ func Get() (DB, error) {
 	})
 	return db, err
 }
+
+// ResetSingletonForTest resets the singleton for testing purposes.
+func ResetSingletonForTest() {
+	once = sync.Once{}
+	db = nil
+	err = nil
+}

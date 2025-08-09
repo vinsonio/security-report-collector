@@ -1,67 +1,131 @@
-package service_test
+package service
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/vinsonio/security-report-collector/internal/service"
 	databasetesting "github.com/vinsonio/security-report-collector/internal/testing"
-	testingcache "github.com/vinsonio/security-report-collector/internal/testing/cache"
+	cachetesting "github.com/vinsonio/security-report-collector/internal/testing/cache"
 	"github.com/vinsonio/security-report-collector/internal/types"
-	"github.com/vinsonio/security-report-collector/internal/util"
 )
 
-func TestReportService_SaveReport(t *testing.T) {
-	report := &types.CSPReport{
+func TestSaveReport_CacheHitSkipsDB(t *testing.T) {
+	store := new(databasetesting.MockDB)
+	cache := new(cachetesting.MockCache)
+	service := NewReportService(store, cache, true)
+
+	report := types.CSPReport{Body: types.CSPReportBody{DocumentURL: "https://example.com"}}
+
+	// Arrange cache hit
+	cache.On("Get", mock.AnythingOfType("string")).Return([]byte("1"), nil)
+
+	err := service.SaveReport("csp", report, "UA")
+	assert.NoError(t, err)
+
+	// DB should not be called
+	store.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	cache.AssertNotCalled(t, "Set", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestSaveReport_CacheMissSavesAndSets(t *testing.T) {
+	store := new(databasetesting.MockDB)
+	cache := new(cachetesting.MockCache)
+	service := NewReportService(store, cache, true)
+
+	report := types.CSPReport{Body: types.CSPReportBody{DocumentURL: "https://example.com"}}
+
+	cache.On("Get", mock.AnythingOfType("string")).Return([]byte(nil), nil)
+	store.On("Save", "csp", mock.AnythingOfType("types.CSPReport"), "UA", mock.AnythingOfType("string")).Return(nil)
+	cache.On("Set", mock.AnythingOfType("string"), mock.Anything, mock.Anything).Return(nil)
+
+	err := service.SaveReport("csp", report, "UA")
+	assert.NoError(t, err)
+	store.AssertExpectations(t)
+	cache.AssertExpectations(t)
+}
+
+func TestSaveReport_CacheDisabled_NoGet(t *testing.T) {
+	store := new(databasetesting.MockDB)
+	cache := new(cachetesting.MockCache)
+	service := NewReportService(store, cache, false)
+
+	report := types.CSPReport{Body: types.CSPReportBody{DocumentURL: "https://example.com"}}
+
+	// Expect only Save
+	store.On("Save", "csp", mock.AnythingOfType("types.CSPReport"), "UA", mock.AnythingOfType("string")).Return(nil)
+
+	err := service.SaveReport("csp", report, "UA")
+	assert.NoError(t, err)
+	store.AssertExpectations(t)
+	cache.AssertNotCalled(t, "Get", mock.Anything)
+}
+
+func TestSaveReport_CacheGetError(t *testing.T) {
+	store := new(databasetesting.MockDB)
+	cache := new(cachetesting.MockCache)
+	service := NewReportService(store, cache, true)
+
+	report := types.CSPReport{Body: types.CSPReportBody{DocumentURL: "https://example.com"}}
+
+	// Cache Get returns error
+	cache.On("Get", mock.AnythingOfType("string")).Return([]byte(nil), errors.New("cache error"))
+
+	err := service.SaveReport("csp", report, "UA")
+	assert.Error(t, err)
+	assert.Equal(t, "cache error", err.Error())
+
+	// DB and Set should not be called
+	store.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	cache.AssertNotCalled(t, "Set", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestSaveReport_CacheSetError(t *testing.T) {
+	store := new(databasetesting.MockDB)
+	cache := new(cachetesting.MockCache)
+	service := NewReportService(store, cache, true)
+
+	report := types.CSPReport{Body: types.CSPReportBody{DocumentURL: "https://example.com"}}
+
+	cache.On("Get", mock.AnythingOfType("string")).Return([]byte(nil), nil)
+	store.On("Save", "csp", mock.AnythingOfType("types.CSPReport"), "UA", mock.AnythingOfType("string")).Return(nil)
+	cache.On("Set", mock.AnythingOfType("string"), mock.Anything, mock.Anything).Return(errors.New("cache set error"))
+
+	err := service.SaveReport("csp", report, "UA")
+	assert.Error(t, err)
+	assert.Equal(t, "cache set error", err.Error())
+	store.AssertExpectations(t)
+	cache.AssertExpectations(t)
+}
+
+func TestReport_JSONAndHashData(t *testing.T) {
+	report := types.CSPReport{
+		URL:        "https://example.com",
+		ReportType: "csp-violation",
 		Body: types.CSPReportBody{
-			DocumentURL:        "http://example.com/signup.html",
-			Referrer:           "",
-			BlockedURL:         "http://example.com/css/style.css",
-			EffectiveDirective: "style-src cdn.example.com",
-			OriginalPolicy:     "default-src 'none'; style-src cdn.example.com; report-uri /_/csp-reports",
+			DocumentURL:        "https://example.com",
+			EffectiveDirective: "script-src",
+			BlockedURL:         "https://cdn.example.com/script.js",
+			SourceFile:         "https://example.com/app.js",
+			LineNumber:         10,
+			ColumnNumber:       20,
 		},
 	}
 
-	hashData, err := report.HashData()
+	b, err := report.JSON()
 	assert.NoError(t, err)
-	hashBytes, err := util.StableMarshal(hashData)
+	assert.True(t, json.Valid(b))
+
+	h, err := report.HashData()
 	assert.NoError(t, err)
-	hashSum := sha256.Sum256(hashBytes)
-	hash := hex.EncodeToString(hashSum[:])
-
-	t.Run("cache enabled", func(t *testing.T) {
-		store := new(databasetesting.MockDB)
-		cache := new(testingcache.MockCache)
-		reportService := service.NewReportService(store, cache, true)
-		reportJSON, err := json.Marshal(report)
-		assert.NoError(t, err)
-
-		cache.On("Set", hash, reportJSON, time.Hour).Return(nil)
-		store.On("Save", "csp", report, "user-agent", hash).Return(nil)
-
-		err = reportService.SaveReport("csp", report, "user-agent")
-		assert.NoError(t, err)
-
-		store.AssertExpectations(t)
-		cache.AssertExpectations(t)
-	})
-
-	t.Run("cache disabled", func(t *testing.T) {
-		store := new(databasetesting.MockDB)
-		cache := new(testingcache.MockCache)
-		reportService := service.NewReportService(store, cache, false)
-
-		store.On("Save", "csp", report, "user-agent", hash).Return(nil)
-
-		err = reportService.SaveReport("csp", report, "user-agent")
-		assert.NoError(t, err)
-
-		store.AssertExpectations(t)
-		cache.AssertNotCalled(t, "Set", mock.Anything, mock.Anything, mock.Anything)
-	})
+	m, ok := h.(types.CSPReportHashData)
+	assert.True(t, ok)
+	assert.Equal(t, "https://example.com", m.DocumentURL)
+	assert.Equal(t, "script-src", m.EffectiveDirective)
+	assert.Equal(t, "https://cdn.example.com/script.js", m.BlockedURL)
+	assert.Equal(t, "https://example.com/app.js", m.SourceFile)
+	assert.Equal(t, 10, m.LineNumber)
+	assert.Equal(t, 20, m.ColumnNumber)
 }

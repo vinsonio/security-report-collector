@@ -32,10 +32,15 @@ func NewSQLiteDB(cfg config.SQLite) (DB, error) {
 		return nil, err
 	}
 
+	return &SQLiteDB{DB: db}, nil
+}
+
+// Migrate runs the database migrations.
+func (s *SQLiteDB) Migrate() error {
 	var driver database.Driver
-	driver, err = sqlite3.WithInstance(db, &sqlite3.Config{})
+	driver, err := sqlite3.WithInstance(s.DB, &sqlite3.Config{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// get the path to the migrations directory
@@ -49,17 +54,17 @@ func NewSQLiteDB(cfg config.SQLite) (DB, error) {
 		driver,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = m.Up()
 	if err != nil && err != migrate.ErrNoChange {
-		return nil, err
+		return err
 	}
 
 	log.Println("Database migration completed")
 
-	return &SQLiteDB{DB: db}, nil
+	return nil
 }
 
 // Save saves a report to the database.

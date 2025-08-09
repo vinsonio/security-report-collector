@@ -20,3 +20,10 @@ func Get() (Cache, error) {
 	})
 	return cache, err
 }
+
+// ResetSingletonForTest resets the cache singleton for testing purposes.
+func ResetSingletonForTest() {
+	once = sync.Once{}
+	cache = nil
+	err = nil
+}

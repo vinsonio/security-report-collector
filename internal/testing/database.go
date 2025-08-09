@@ -35,6 +35,11 @@ func GetDBForTest(t *testing.T) DB {
 		t.Fatalf("Failed to create db for testing: %v", err)
 	}
 
+	// Ensure database schema is migrated before attempting to modify tables
+	if err := db.Migrate(); err != nil {
+		t.Fatalf("Failed to migrate db for testing: %v", err)
+	}
+
 	switch d := db.(type) {
 	case *database.SQLiteDB:
 		_, err := d.DB.Exec("DELETE FROM reports")

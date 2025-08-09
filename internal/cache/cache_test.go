@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/vinsonio/security-report-collector/internal/config"
 )
 
 func testCache(t *testing.T, c Cache, expirationTTL time.Duration, expirationSleep time.Duration) {
@@ -36,6 +37,59 @@ func testCache(t *testing.T, c Cache, expirationTTL time.Duration, expirationSle
 	retrievedValue, err = c.Get(key)
 	assert.NoError(t, err)
 	assert.Nil(t, retrievedValue)
+}
+
+func TestFileCache(t *testing.T) {
+	tmpDir := t.TempDir()
+	
+	c, err := NewFileCache(tmpDir)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, c.Close())
+	}()
+	
+	testCache(t, c, 1*time.Millisecond, 2*time.Millisecond)
+}
+
+func TestFileCache_InvalidPath(t *testing.T) {
+	_, err := NewFileCache("/invalid/path/that/should/not/exist")
+	assert.Error(t, err)
+}
+
+func TestFileCache_GetNonExistentKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	
+	c, err := NewFileCache(tmpDir)
+	assert.NoError(t, err)
+	defer c.Close()
+
+	value, err := c.Get("non-existent-key")
+	assert.NoError(t, err)
+	assert.Nil(t, value)
+}
+
+func TestFactory_FileCache(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Cache{
+		Driver: "file",
+		File:   config.FileCache{Dir: tmpDir},
+	}
+
+	cache, err := New(cfg)
+	assert.NoError(t, err)
+	assert.NotNil(t, cache)
+	assert.IsType(t, &FileCache{}, cache)
+}
+
+func TestFactory_UnsupportedDriver(t *testing.T) {
+	cfg := &config.Cache{
+		Driver: "unsupported",
+	}
+
+	cache, err := New(cfg)
+	assert.Error(t, err)
+	assert.Nil(t, cache)
+	assert.Contains(t, err.Error(), "unsupported cache driver")
 }
 
 func TestRedisCache(t *testing.T) {
