@@ -9,13 +9,14 @@ import (
 var (
 	once sync.Once
 	db   DB
+	err  error
 )
 
 // Get returns a new or existing database backend.
 func Get() (DB, error) {
-	var err error
 	once.Do(func() {
-		db, err = New(config.NewDB())
+		cfg := config.NewDB()
+		db, err = New(cfg)
 	})
 	return db, err
 }

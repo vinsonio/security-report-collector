@@ -4,14 +4,12 @@ import (
 	"log"
 
 	"github.com/vinsonio/security-report-collector/internal/cache"
-	"github.com/vinsonio/security-report-collector/internal/config"
 	"github.com/vinsonio/security-report-collector/internal/database"
 )
 
 // Init initializes the application's dependencies.
 func Init() (database.DB, cache.Cache, error) {
-	cfg := config.NewDB()
-	db, err := database.New(cfg)
+	db, err := database.Get()
 	if err != nil {
 		return nil, nil, err
 	}
