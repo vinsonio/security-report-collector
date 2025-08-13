@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Environment
+.env
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# DB files
+*.db
+
+# IDE settings
+.vscode/
+.idea/
+.trae/
+
+# Readme and other docs
+docs/
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+LICENSE
+SECURITY.md
+CODE_OF_CONDUCT.md
+
+# Test
+coverage.out
