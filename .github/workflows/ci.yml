@@ -55,7 +55,7 @@ jobs:
           DB_PORT: 3306
           DB_USER: root
           DB_PASSWORD: password
-          DB_NAME: reports
+          DB_DATABASE: reports
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           MEMCACHED_HOST: localhost

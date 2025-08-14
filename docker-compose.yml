@@ -32,7 +32,7 @@ services:
       - "${DB_PORT:-3306}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-password}
-      MYSQL_DATABASE: ${DB_NAME:-reports}
+      MYSQL_DATABASE: ${DB_DATABASE:-reports}
     volumes:
       - mysql-data:/var/lib/mysql
     networks:
